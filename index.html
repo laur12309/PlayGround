@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Metronome</title>
+  <style>
+    :root { --ink:#10130f; --paper:#f4f1e8; --orange:#fe4b22; --lime:#bddb41; --blue:#7ec8cf; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; width:100%; height:100%; overflow:hidden; background:var(--paper); color:var(--ink); font-family:"Trebuchet MS",Arial,sans-serif; }
+    button { font:inherit; }
+    #app { position:relative; width:100%; height:100%; min-height:560px; overflow:hidden; }
+    .grain { position:absolute; inset:0; pointer-events:none; opacity:.12; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.32'/%3E%3C/svg%3E"); }
+    .topbar { position:absolute; z-index:20; top:0; left:0; right:0; height:82px; display:flex; align-items:center; justify-content:space-between; padding:18px 28px; border-bottom:2px solid var(--ink); background:rgba(244,241,232,.94); }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo { width:48px; height:48px; border:2px solid var(--ink); border-radius:50%; position:relative; background:white; }
+    .logo:before { content:""; position:absolute; width:8px; height:8px; border-radius:50%; background:var(--orange); left:18px; top:18px; }
+    .logo:after { content:""; position:absolute; width:3px; height:18px; background:var(--ink); left:22px; top:5px; transform-origin:50% 19px; transform:rotate(28deg); }
+    .brand h1 { margin:0; font-family:Georgia,serif; font-size:27px; letter-spacing:-1.5px; }
+    .brand p { margin:2px 0 0; font-size:10px; text-transform:uppercase; letter-spacing:2.2px; }
+    .stats { display:flex; align-items:center; gap:28px; }
+    .stat { min-width:72px; text-align:right; }
+    .stat label { display:block; font-size:9px; letter-spacing:2px; text-transform:uppercase; }
+    .stat b { display:block; margin-top:3px; font-family:Georgia,serif; font-size:20px; }
+    .pause { width:42px; height:42px; border:2px solid var(--ink); border-radius:50%; background:transparent; cursor:pointer; display:grid; place-items:center; }
+    .pause i { display:block; width:4px; height:14px; background:var(--ink); box-shadow:8px 0 var(--ink); }
+
+    #stage { position:absolute; left:0; right:0; top:82px; bottom:0; }
+    .lane { position:absolute; top:0; bottom:0; width:25%; border-right:1.5px solid rgba(16,19,15,.14); }
+    .lane:nth-child(1){ left:0 } .lane:nth-child(2){ left:25% } .lane:nth-child(3){ left:50% } .lane:nth-child(4){ left:75%; border-right:0 }
+    .lane.active { background:rgba(254,75,34,.09); }
+    .lane-label { position:absolute; bottom:26px; left:50%; transform:translateX(-50%); width:54px; height:54px; border:2px solid var(--ink); border-radius:50%; background:var(--paper); display:grid; place-items:center; font-family:Georgia,serif; font-size:20px; z-index:8; }
+    .lane.active .lane-label { background:var(--orange); }
+    .hit-line { position:absolute; z-index:5; left:0; right:0; bottom:108px; height:2px; background:var(--ink); }
+    .hit-line:before,.hit-line:after { content:""; position:absolute; width:12px; height:12px; border:2px solid var(--ink); background:var(--paper); border-radius:50%; bottom:-7px; }
+    .hit-line:before { left:-7px } .hit-line:after { right:-7px }
+    .track-spot { position:absolute; left:50%; top:42%; width:250px; height:250px; transform:translate(-50%,-50%); border-radius:50%; background:var(--lime); opacity:.18; filter:blur(12px); }
+    .note { position:absolute; z-index:7; width:72px; height:72px; margin-left:-36px; border:2px solid var(--ink); border-radius:50%; display:grid; place-items:center; font-family:Georgia,serif; font-size:21px; box-shadow:5px 5px 0 var(--ink); }
+    .note.red { background:var(--orange); } .note.blue { background:var(--blue); } .note.lime { background:var(--lime); } .note.white { background:white; }
+    .judgement { position:absolute; z-index:12; left:50%; bottom:168px; transform:translateX(-50%) scale(.8); font-family:Georgia,serif; font-size:34px; font-style:italic; opacity:0; transition:.12s ease; }
+    .judgement.show { opacity:1; transform:translateX(-50%) scale(1); }
+
+    #startScreen { position:absolute; z-index:30; inset:82px 0 0; background:var(--paper); display:flex; }
+    .hero { width:58%; position:relative; border-right:2px solid var(--ink); padding:7vh 7vw; }
+    .eyebrow { font-size:10px; letter-spacing:3px; text-transform:uppercase; }
+    .hero h2 { margin:18px 0 10px; font-family:Georgia,serif; font-size:clamp(58px,8vw,112px); line-height:.82; letter-spacing:-7px; }
+    .hero h2 em { display:block; color:var(--orange); font-weight:400; }
+    .hero-copy { max-width:420px; margin:28px 0 35px; line-height:1.55; font-size:14px; }
+    .primary { border:2px solid var(--ink); background:var(--orange); box-shadow:7px 7px 0 var(--ink); height:62px; min-width:220px; padding:0 24px; font-weight:bold; letter-spacing:1px; cursor:pointer; }
+    .primary:active { transform:translate(5px,5px); box-shadow:2px 2px 0 var(--ink); }
+    .decor { position:absolute; right:-60px; top:32%; width:180px; height:180px; border:2px solid var(--ink); border-radius:50%; background:var(--lime); z-index:-0; }
+    .decor:before { content:""; position:absolute; left:50%; top:-24px; width:2px; height:224px; background:var(--ink); transform:rotate(38deg); }
+    .decor:after { content:""; position:absolute; width:18px; height:18px; border:2px solid var(--ink); border-radius:50%; background:var(--orange); left:80px; top:80px; }
+    .panel { width:42%; display:flex; flex-direction:column; justify-content:center; padding:5vw; }
+    .panel h3 { margin:0 0 22px; font-family:Georgia,serif; font-size:28px; }
+    .difficulty { display:grid; gap:10px; }
+    .diff { height:58px; border:1.5px solid var(--ink); background:transparent; display:flex; align-items:center; justify-content:space-between; padding:0 18px; cursor:pointer; }
+    .diff b { font-family:Georgia,serif; font-size:18px; } .diff span { font-size:10px; letter-spacing:2px; }
+    .diff.selected { background:var(--lime); box-shadow:4px 4px 0 var(--ink); }
+    .controls { margin-top:30px; display:flex; gap:18px; font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+    .key { display:inline-grid; place-items:center; width:28px; height:28px; border:1.5px solid var(--ink); border-radius:50%; margin-right:5px; background:white; }
+
+    #pauseScreen,#endScreen { position:absolute; z-index:40; inset:82px 0 0; display:none; place-items:center; background:rgba(244,241,232,.88); backdrop-filter:blur(4px); }
+    .modal { width:min(420px,calc(100% - 40px)); border:2px solid var(--ink); background:var(--paper); box-shadow:10px 10px 0 var(--ink); padding:38px; text-align:center; }
+    .modal h2 { margin:0 0 12px; font-family:Georgia,serif; font-size:44px; }
+    .modal p { margin:0 0 24px; }
+    .modal .primary { width:100%; }
+    .score-ring { width:130px; height:130px; border:2px solid var(--ink); border-radius:50%; display:grid; place-items:center; margin:0 auto 18px; background:var(--lime); font-family:Georgia,serif; font-size:42px; }
+
+    @media (max-width:700px) {
+      #app { min-height:500px; } .topbar { height:68px; padding:10px 14px; } .brand p { display:none } .brand h1 { font-size:22px } .logo { width:40px; height:40px } .stats { gap:8px } .stat { min-width:58px } .stat:nth-child(2) { display:none } .pause { width:38px;height:38px }
+      #stage { top:68px } #startScreen { inset:68px 0 0 } .lane-label { bottom:18px; width:46px;height:46px } .hit-line { bottom:92px } .judgement { bottom:145px }
+      .hero { width:100%; border:0; padding:7vh 8vw } .hero h2 { font-size:68px } .hero-copy { max-width:300px } .panel { position:absolute; right:12px; bottom:20px; width:44%; padding:10px; background:rgba(244,241,232,.95); border:1.5px solid var(--ink); } .panel h3 { display:none } .diff { height:42px; padding:0 10px } .diff span { display:none } .controls { display:none } .decor { width:130px;height:130px;right:-35px }
+      #pauseScreen,#endScreen { inset:68px 0 0 } .note { width:58px;height:58px;margin-left:-29px;font-size:18px }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><div class="logo"></div><div><h1>Metronome</h1><p>Keep the pulse</p></div></div>
+    <div class="stats"><div class="stat"><label>Score</label><b id="score">000000</b></div><div class="stat"><label>Combo</label><b id="combo">0×</b></div><button class="pause" id="pauseBtn" aria-label="Pause"><i></i></button></div>
+  </header>
+  <main id="stage">
+    <div class="lane" data-lane="0"><div class="lane-label">D</div></div><div class="lane" data-lane="1"><div class="lane-label">F</div></div><div class="lane" data-lane="2"><div class="lane-label">J</div></div><div class="lane" data-lane="3"><div class="lane-label">K</div></div>
+    <div class="track-spot"></div><div class="hit-line"></div><div class="judgement" id="judgement">Perfect</div>
+  </main>
+  <section id="startScreen">
+    <div class="hero"><div class="eyebrow">A rhythm experiment · 01</div><h2>Find the<em>beat.</em></h2><p class="hero-copy">Hit each note as it crosses the line. Stay precise, build your combo, and keep the rhythm alive.</p><button class="primary" id="startBtn">START SESSION</button><div class="decor"></div></div>
+    <aside class="panel"><h3>Choose tempo</h3><div class="difficulty"><button class="diff selected" data-bpm="92"><b>Slow</b><span>92 BPM</span></button><button class="diff" data-bpm="116"><b>Steady</b><span>116 BPM</span></button><button class="diff" data-bpm="140"><b>Quick</b><span>140 BPM</span></button></div><div class="controls"><span><i class="key">D</i>D</span><span><i class="key">F</i>F</span><span><i class="key">J</i>J</span><span><i class="key">K</i>K</span></div></aside>
+  </section>
+  <section id="pauseScreen"><div class="modal"><h2>Paused</h2><p>The beat is waiting.</p><button class="primary resume">RESUME</button></div></section>
+  <section id="endScreen"><div class="modal"><div class="score-ring" id="finalScore">0</div><h2 id="finalTitle">Nice rhythm</h2><p id="finalCopy">You kept the pulse.</p><button class="primary" id="againBtn">PLAY AGAIN</button></div></section>
+  <div class="grain"></div>
+</div>
+<script>
+const stage=document.getElementById('stage'),startScreen=document.getElementById('startScreen'),pauseScreen=document.getElementById('pauseScreen'),endScreen=document.getElementById('endScreen');
+let bpm=92, running=false, paused=false, score=0, combo=0, elapsed=0, lastTime=0, spawnTimer=0, duration=52, difficulty='slow';
+let notes=[], lastLane=-1;
+const keyMap={d:0,f:1,j:2,k:3};
+const laneEls=[...document.querySelectorAll('.lane')];
+const scoreEl=document.getElementById('score'),comboEl=document.getElementById('combo'),judgement=document.getElementById('judgement');
+
+document.querySelectorAll('.diff').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.diff').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');bpm=+btn.dataset.bpm;difficulty=btn.querySelector('b').textContent.toLower)});
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('againBtn').addEventListener('click',()=>location.reload());
+document.getElementById('pauseBtn').addEventListener('click',togglePause);document.querySelector('.resume').addEventListener('click',togglePause);
+function startGame(){startScreen.style.display='none';running=true;paused=false;elapsed=0;lastTime=performance.now();requestAnimationFrame(loop)}
+function togglePause(){if(!running)return;paused=!paused;pauseScreen.style.display=paused?'grid':'none';if(!paused){lastTime=performance.now();requestAnimationFrame(loop)}}
+function spawnNote(){let lane=(Math.floor(Math.random()*4)+(lastLane===-1?0:1))%4;if(lane===lastLane&&Math.random()<.7)lane=(lane+1)%4;lastLane=lane;const n=document.createElement('div');n.className='note '+['red','white','blue','lime'][lane];n.textContent=['D','F','J','K'][lane];n.dataset.lane=lane;n.style.left=(lane*25+12.5)+'%';n.style.top='-90px';stage.appendChild(n);notes.push({el:n,y:-90,hit:false})}
+function loop(now){if(!running||paused)return;const dt=Math.min((now-lastTime)/1000,.035);lastTime=now;elapsed+=dt;spawnTimer-=dt;const interval=60/bpm*.82;if(spawnTimer<=0){spawnNote();spawnTimer=interval}const hitY=stage.clientHeight-108;for(let i=notes.length-1;i>=0;i--){const n=notes[i];n.y+=dt*(290+bpm*.7);n.el.style.top=n.y+'px';if(n.y>stage.clientHeight+80){n.el.remove();notes.splice(i,1);if(!n.hit){combo=0;showJudge('Miss')}}}updateStats();if(elapsed>=duration){finish();return}requestAnimationFrame(loop)}
+function hitLane(lane){laneEls[lane].classList.add('active');setTimeout(()=>laneEls[lane].classList.remove('active'),100);const hitY=stage.clientHeight-108;let best=null,bestDist=Infinity;for(const n of notes){if(n.hit||+n.dataset.lane!==lane)continue;const d=Math.abs(n.y+36-hitY);if(d<bestDist){best=n;bestDist=d}}if(best&&bestDist<105){best.hit=true;best.el.style.transition='.12s';best.el.style.transform='scale(1.35)';best.el.style.opacity='0';setTimeout(()=>best.el.remove(),120);notes.splice(notes.indexOf(best),1);let gained;if(bestDist<35){gained=100;showJudge('Perfect')}else if(bestDist<70){gained=70;showJudge('Great')}else{gained=40;showJudge('Good')}combo++;score+=gained+combo*5}else{combo=0;showJudge('Miss')}}
+function showJudge(text){judgement.textContent=text;judgement.classList.remove('show');void judgement.offsetWidth;judgement.classList.add('show');clearTimeout(showJudge.t);showJudge.t=setTimeout(()=>judgement.classList.remove('show'),400)}
+function updateStats(){scoreEl.textContent=String(score).padStart(6,'0');comboEl.textContent=combo+'×'}
+function finish(){running=false;document.querySelectorAll('.note').forEach(n=>n.remove());notes=[];endScreen.style.display='grid';document.getElementById('finalScore').textContent=Math.round(score/100);document.getElementById('finalTitle').textContent=score>3000?'Locked in':score>1500?'Nice rhythm':'Keep practicing';document.getElementById('finalCopy').textContent='Your final score · '+score.toLocaleString()}
+window.addEventListener('keydown',e=>{if(e.repeat)return;const k=e.key.toLowerCase();if(k in keyMap)hitLane(keyMap[k]);if(e.key==='Escape')togglePause});
+stage.addEventListener('pointerdown',e=>{const r=stage.getBoundingClientRect();const lane=Math.min(3,Math.max(0,Math.floor((e.clientX-r.left)/(r.width/4))));hitLane(lane)});
+</script>
+</body>
+</html>
