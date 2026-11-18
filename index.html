@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Metronome</title>
+  <style>
+    :root { --ink:#f3f0e8; --muted:#9a9a92; --orange:#ff6238; --line:rgba(255,255,255,.12); }
+    * { box-sizing:border-box; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; background:#0b0b0b; }
+    body { font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); }
+    button,input { font:inherit; }
+    button { color:inherit; }
+    .app { width:100%; height:100%; display:grid; grid-template-rows:74px 1fr 86px; }
+    header { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:0 34px; border-bottom:1px solid var(--line); }
+    .brand { letter-spacing:.28em; font-size:12px; font-weight:800; }
+    .brand span { color:var(--orange); }
+    .stats { display:flex; align-items:center; gap:38px; }
+    .stat { display:flex; align-items:baseline; gap:8px; }
+    .stat label { color:var(--muted); font-size:10px; letter-spacing:.18em; text-transform:uppercase; }
+    .stat b { font-size:18px; font-variant-numeric:tabular-nums; }
+    .status { justify-self:end; display:flex; align-items:center; gap:9px; color:var(--muted); font-size:11px; letter-spacing:.12em; text-transform:uppercase; }
+    .status i { width:7px; height:7px; border-radius:50%; background:var(--orange); box-shadow:0 0 14px var(--orange); }
+    main { position:relative; min-height:0; display:grid; grid-template-columns:minmax(230px,300px) 1fr minmax(230px,300px); }
+    .side { position:relative; z-index:2; padding:38px 34px; }
+    .left { border-right:1px solid var(--line); }
+    .right { border-left:1px solid var(--line); }
+    .section-label { color:var(--muted); font-size:10px; letter-spacing:.2em; text-transform:uppercase; margin-bottom:18px; }
+    .tempo { display:flex; align-items:end; gap:8px; }
+    .tempo strong { font-size:64px; line-height:.85; letter-spacing:-.06em; font-variant-numeric:tabular-nums; }
+    .tempo span { color:var(--muted); font-size:11px; letter-spacing:.12em; margin-bottom:4px; }
+    input[type=range] { width:100%; margin:28px 0 20px; accent-color:var(--orange); }
+    .tempo-presets { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .tempo-presets button,.icon-btn { height:34px; border:1px solid var(--line); background:transparent; border-radius:3px; cursor:pointer; }
+    .tempo-presets button:hover,.tempo-presets button.active { border-color:var(--orange); color:var(--orange); }
+    .pattern { display:grid; gap:8px; }
+    .beat { height:38px; display:flex; align-items:center; justify-content:space-between; border:1px solid var(--line); padding:0 12px; border-radius:3px; color:var(--muted); font-size:11px; }
+    .beat.active { color:var(--ink); border-color:rgba(255,98,56,.65); background:rgba(255,98,56,.08); }
+    .beat i { width:8px; height:8px; border-radius:50%; border:1px solid currentColor; }
+    .beat.active i { background:var(--orange); border-color:var(--orange); box-shadow:0 0 12px rgba(255,98,56,.8); }
+    .stage { position:relative; display:grid; place-items:center; overflow:hidden; }
+    .stage canvas { position:absolute; inset:0; width:100%; height:100%; }
+    .hit-ring { position:relative; width:min(42vw,390px); aspect-ratio:1; border-radius:50%; border:1px solid rgba(255,255,255,.11); display:grid; place-items:center; transition:transform .06s,border-color .12s; }
+    .hit-ring::before { content:""; position:absolute; inset:11%; border-radius:50%; border:1px solid rgba(255,255,255,.08); }
+    .hit-ring.pulse { transform:scale(.975); border-color:rgba(255,98,56,.8); }
+    .hit-core { text-align:center; }
+    .hit-core .timing { display:block; color:var(--orange); height:30px; font-size:13px; letter-spacing:.18em; text-transform:uppercase; }
+    .hit-core strong { display:block; font-size:clamp(50px,7vw,96px); line-height:.9; letter-spacing:-.08em; }
+    .hit-core small { display:block; margin-top:18px; color:var(--muted); font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
+    footer { border-top:1px solid var(--line); display:flex; align-items:center; justify-content:center; gap:12px; }
+    .transport { display:flex; gap:8px; }
+    .transport button { min-width:56px; height:44px; border:1px solid var(--line); background:#111; border-radius:4px; cursor:pointer; }
+    .transport .play { width:118px; background:var(--orange); border-color:var(--orange); color:#101010; font-weight:800; letter-spacing:.08em; }
+    .key { position:absolute; bottom:14px; right:18px; color:#777; font-size:9px; letter-spacing:.12em; }
+    .flash-good { animation:good .18s ease-out; } .flash-miss { animation:miss .18s ease-out; }
+    @keyframes good { 50% { box-shadow:inset 0 0 80px rgba(255,98,56,.12); } }
+    @keyframes miss { 50% { box-shadow:inset 0 0 80px rgba(255,255,255,.08); } }
+    @media(max-width:800px) {
+      .app { grid-template-rows:64px 1fr 76px; }
+      header { grid-template-columns:1fr auto; padding:0 18px; }
+      .stats { display:none; }
+      main { grid-template-columns:1fr; }
+      .side { display:none; }
+      .stage { grid-column:1; }
+      .hit-ring { width:min(68vw,340px); }
+      .status { font-size:9px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="brand">METRO<span>/</span>NOME</div>
+    <div class="stats">
+      <div class="stat"><label>Score</label><b id="score">0000</b></div>
+      <div class="stat"><label>Combo</label><b id="combo">×0</b></div>
+    </div>
+    <div class="status"><i></i><span id="runStatus">Standby</span></div>
+  </header>
+  <main>
+    <aside class="side left">
+      <div class="section-label">Tempo</div>
+      <div class="tempo"><strong id="bpmText">120</strong><span>BPM</span></div>
+      <input id="bpm" type="range" min="60" max="180" value="120" />
+      <div class="tempo-presets">
+        <button data-bpm="80">Slow</button><button data-bpm="120" class="active">Pulse</button><button data-bpm="160">Fast</button>
+      </div>
+    </aside>
+    <section class="stage" id="stage">
+      <canvas id="grid"></canvas>
+      <div class="hit-ring" id="ring">
+        <div class="hit-core">
+          <span class="timing" id="timing">READY</span>
+          <strong id="counter">1</strong>
+          <small id="beatName">Press play</small>
+        </div>
+      </div>
+      <div class="key">SPACE / TAP TO HIT</div>
+    </section>
+    <aside class="side right">
+      <div class="section-label">Sequence</div>
+      <div class="pattern" id="pattern">
+        <div class="beat active"><span>01 / DOWNBEAT</span><i></i></div>
+        <div class="beat"><span>02 / AND</span><i></i></div>
+        <div class="beat"><span>03 / UPBEAT</span><i></i></div>
+        <div class="beat"><span>04 / AND</span><i></i></div>
+      </div>
+    </aside>
+  </main>
+  <footer>
+    <div class="transport">
+      <button id="reset" title="Reset">↺</button>
+      <button class="play" id="play">START</button>
+    </div>
+  </footer>
+</div>
+<script>
+const $=s=>document.querySelector(s), bpm=$('#bpm'), bpmText=$('#bpmText'), ring=$('#ring');
+let audio, running=false, bpmVal=120, beat=-1, lastBeat=0, score=0, combo=0, bestCombo=0;
+let hitAt=-1, tickTimer, phase=0;
+const beats=['DOWNBEAT','AND','UPBEAT','AND'];
+function initAudio(){ if(!audio) audio=new (window.AudioContext||window.webkitAudioContext)(); if(audio.state==='suspended') audio.resume(); }
+function click(accent=false){ if(!audio)return; const o=audio.createOscillator(),g=audio.createGain(); o.frequency.value=accent?880:540; g.gain.setValueAtTime(.0001,audio.currentTime); g.gain.exponentialRampToValueAtTime(accent?.11:.07,audio.currentTime+.004); g.gain.exponentialRampToValueAtTime(.0001,audio.currentTime+.06); o.connect(g).connect(audio.destination); o.start();o.stop(audio.currentTime+.07); }
+function setBpm(v){ bpmVal=+v; bpmText.textContent=bpmVal; bpm.value=bpmVal; document.querySelectorAll('[data-bpm]').forEach(b=>b.classList.toggle('active',+b.dataset.bpm===bpmVal)); }
+bpm.oninput=e=>setBpm(e.target.value);
+document.querySelectorAll('[data-bpm]').forEach(b=>b.onclick=()=>setBpm(b.dataset.bpm));
+function drawBeat(index){ $('#counter').textContent=index+1; $('#beatName').textContent=beats[index]; document.querySelectorAll('.beat').forEach((el,i)=>el.classList.toggle('active',i===index)); ring.classList.remove('pulse'); void ring.offsetWidth; ring.classList.add('pulse'); }
+function tick(){ if(!running)return; const now=performance.now(), interval=60000/bpmVal; beat=(beat+1)%4; lastBeat=now; drawBeat(beat); click(beat===0); phase=1; hitAt=-1; tickTimer=setTimeout(tick,interval); }
+function start(){ initAudio(); if(running)return; running=true; beat=-1; score=0;combo=0; $('#score').textContent='0000';$('#combo').textContent='×0'; $('#play').textContent='STOP'; $('#runStatus').textContent='Recording'; $('#timing').textContent='LISTEN'; tick(); }
+function stop(){ running=false; clearTimeout(tickTimer); $('#play').textContent='START'; $('#runStatus').textContent='Standby'; $('#timing').textContent='READY'; $('#beatName').textContent='Press play'; }
+$('#play').onclick=()=>running?stop():start();
+$('#reset').onclick=()=>{stop();score=0;combo=0;$('#score').textContent='0000';$('#combo').textContent='×0';$('#counter').textContent='1';document.querySelectorAll('.beat').forEach((el,i)=>el.classList.toggle('active',i===0));};
+function hit(){ if(!running){ start(); return; } const now=performance.now(), interval=60000/bpmVal, elapsed=now-lastBeat, dist=Math.min(elapsed,interval-elapsed)/interval*100; let grade='MISS', pts=0; if(dist<6){grade='PERFECT';pts=100;} else if(dist<12){grade='GOOD';pts=60;} else if(dist<22){grade='OK';pts=30;} if(pts){combo++;bestCombo=Math.max(bestCombo,combo);score+=pts+Math.min(combo*5,50);} else combo=0; $('#timing').textContent=grade; $('#score').textContent=String(score).padStart(4,'0');$('#combo').textContent='×'+combo; const app=$('#app');app.classList.remove('flash-good','flash-miss');void app.offsetWidth;app.classList.add(pts?'flash-good':'flash-miss'); }
+window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventEventDefault?.();hit();}});
+window.addEventListener('pointerdown',e=>{if(e.target.closest('button,input'))return;hit();});
+function resize(){ const c=$('#grid'),r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d; }
+window.addEventListener('resize',resize);resize();
+const c=$('#grid'),ctx=c.getContext('2d');
+function render(){
+  const d=devicePixelRatio||1,w=c.width/d,h=c.height/d;
+  ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='rgba(255,255,255,.035)';ctx.lineWidth=1;
+  const gap=48, ox=(performance.now()/40)%gap;
+  for(let x=-gap+ox;x<w;x+=gap){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+  for(let y=0;y<h;y+=gap){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+  if(running){
+    const interval=60000/bpmVal, elapsed=(performance.now()-lastBeat)/interval;
+    ctx.strokeStyle='rgba(255,98,56,'+(0.08+0.12*(1-Math.abs(elapsed-.5)*2))+')';
+    ctx.lineWidth=1;ctx.beginPath();ctx.arc(w/2,h/2,Math.min(w,h)*(.30+elapsed*.08),0,Math.PI*2);ctx.stroke();
+  }
+  requestAnimationFrame(render);
+}
+render();
+</script>
+</body>
+</html>
